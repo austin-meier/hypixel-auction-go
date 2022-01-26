@@ -35,6 +35,8 @@ type Auction struct {
 
 func main() {
 
+	start := time.Now()
+
 	url := "https://api.hypixel.net/skyblock/auctions"
 
 	client := http.Client{
@@ -94,5 +96,9 @@ func main() {
 		auctions = append(auctions, auc)
 	}
 
-	fmt.Print("Auction Item: ", auctions[0])
+	duration := time.Since(start)
+
+	fmt.Println("Auction Item: ", auctions[0])
+
+	fmt.Println("Execution Time: ", duration)
 }
