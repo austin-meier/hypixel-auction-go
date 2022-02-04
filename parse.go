@@ -2,47 +2,42 @@ package main
 
 import (
 	"fmt"
-	"log"
+	"io"
 	"io/ioutil"
-	"time"
+	"log"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/valyala/fastjson"
 )
+
 type Bid struct {
-	bidder string
-	profile_id string
-	amount int
+	bidder    string
+	profileId string
+	amount    int
 	timestamp int
 }
 
 type Auction struct {
-	uuid string 
-	auctioneer string
-	profile_id string
-	start int
-	end int
-	item_name string
-	item_lore string
-	extra string
-	category string
-	tier string
-	starting_bid int
-	claimed bool
-	highest_bid_amount int
-	bids []Bid
+	uuid             string
+	auctioneer       string
+	profileId        string
+	start            int
+	end              int
+	itemName         string
+	itemLore         string
+	extra            string
+	category         string
+	tier             string
+	startingBid      int
+	claimed          bool
+	highestBidAmount int
+	bids             []Bid
 }
 
-func main() {
-
-	start := time.Now()
-
-	url := "https://api.hypixel.net/skyblock/auctions"
-
-	client := http.Client{
-		Timeout: time.Second * 2, // Timeout after 2 seconds
-	}
-
+func request(page int, client http.Client) []*fastjson.Value {
+	url := "https://api.hypixel.net/skyblock/auctions?page=" + strconv.Itoa(page)
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		log.Fatal(err)
@@ -56,7 +51,12 @@ func main() {
 	}
 
 	if res.Body != nil {
-		defer res.Body.Close()
+		defer func(Body io.ReadCloser) {
+			err := Body.Close()
+			if err != nil {
+
+			}
+		}(res.Body)
 	}
 
 	body, readErr := ioutil.ReadAll(res.Body)
@@ -71,34 +71,58 @@ func main() {
 		log.Fatalf("cannot parse json: %s", err)
 	}
 
-	a := v.GetArray("auctions")
-	
+	return v.GetArray("auctions")
+
+}
+
+func newClient() http.Client {
+	tr := &http.Transport{
+		MaxIdleConnsPerHost: 100,
+	}
+
+	client := http.Client{
+		Timeout:   time.Second * 100, // Timeout after 2 seconds
+		Transport: tr,                // Keeps connections open
+	}
+
+	return client
+}
+
+func main() {
+
+	start := time.Now()
+
+	client := newClient()
+
+	a := request(0, client)
+
 	var auctions []Auction
 
 	for i := 0; i < len(a); i++ {
-		var auc Auction = Auction {
-			uuid: string(a[i].GetStringBytes("uuid")),
-			auctioneer: string(a[i].GetStringBytes("auctioneer")),
-			profile_id: string(a[i].GetStringBytes("profile_id")),
-			start: a[i].GetInt("start"),
-			end: a[i].GetInt("end"),
-			item_name: string(a[i].GetStringBytes("item_name")),
-			item_lore: string(a[i].GetStringBytes("item_lore")),
-			extra: string(a[i].GetStringBytes("extra")),
-			category: string(a[i].GetStringBytes("category")),
-			tier: string(a[i].GetStringBytes("tier")),
-			starting_bid: a[i].GetInt("starting_bid"),
-			claimed: a[i].GetBool("claimed"),
-			highest_bid_amount: a[i].GetInt("highest_bid_amount"),
-			bids: nil,
+		var auc Auction = Auction{
+			uuid:             string(a[i].GetStringBytes("uuid")),
+			auctioneer:       string(a[i].GetStringBytes("auctioneer")),
+			profileId:        string(a[i].GetStringBytes("profile_id")),
+			start:            a[i].GetInt("start"),
+			end:              a[i].GetInt("end"),
+			itemName:         string(a[i].GetStringBytes("item_name")),
+			itemLore:         string(a[i].GetStringBytes("item_lore")),
+			extra:            string(a[i].GetStringBytes("extra")),
+			category:         string(a[i].GetStringBytes("category")),
+			tier:             string(a[i].GetStringBytes("tier")),
+			startingBid:      a[i].GetInt("starting_bid"),
+			claimed:          a[i].GetBool("claimed"),
+			highestBidAmount: a[i].GetInt("highest_bid_amount"),
+			bids:             nil,
 		}
 
 		auctions = append(auctions, auc)
 	}
 
-	duration := time.Since(start)
-
 	fmt.Println("Auction Item: ", auctions[0])
 
+	duration := time.Since(start)
+
 	fmt.Println("Execution Time: ", duration)
+
 }
